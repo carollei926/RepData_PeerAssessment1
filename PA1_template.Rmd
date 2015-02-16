@@ -2,6 +2,7 @@
   title: "Reproducible Research: Peer Assessment 1"
   output: 
   html_document:
+  self_contained: true
   keep_md: true
 ---
   
@@ -10,10 +11,7 @@
   
 ### set working directery and read in data
 ```{r}
-
 library(ggplot2)
-#setwd("C:/Users/leip/Desktop/Reproducible Research/Course Project 1")
-#activity<-read.csv("./activity.csv", header=T, na.strings = "NA")
 setwd("C:/Users/leip/Desktop/Reproducible Research/RepData_PeerAssessment1")
 unzip(zipfile = "activity.zip")
 activity<-read.csv("activity.csv", header=T, na.strings = "NA")
@@ -27,7 +25,7 @@ names(Dsum) <- c("Date","Sum.step")
 ```
 
 ### 2. Make a histogram of the total number of steps taken each day
-```{r}
+```{r TotalStepDay}
 qplot(Sum.step, data=Dsum, geom="histogram", binwidth = 1000,
       xlab="Total number of steps taken each day")
 ```
@@ -44,9 +42,10 @@ merge(Dmean, Dmedian, "Date")
 ## What is the average daily activity pattern?
 ### 1. Time series plot of the 5-minute interval (x-axis) and the average number of steps taken, 
 ###    averaged across all days (y-axis)
-```{r}
+```{r AvgStepInterval}
 Iavg <- aggregate(activity[,'steps'], by=list(activity$interval), FUN=mean, na.rm=TRUE)
 names(Iavg) <- c("Interval","Mean.step")
+
 
 plot2 <- ggplot(Iavg, aes(Interval, Mean.step)) + geom_line() +
           xlab("5-minute Interval") + ylab("Average Steps Across All Days")
@@ -59,7 +58,69 @@ Iavg[which(Iavg$Mean.step==max(Iavg$Mean.step)),  ]
 ```
 
 ## Imputing missing values
+### 1. Calculate and report the total number of missing values in the dataset 
+###    (total number of row of NAs)
+```{r}
+missing <- activity[activity$steps == 'NA', ]
+### Number of obs is num of missing values
+str(missing)
+```
 
+### 2. Imputing missing values (impute with mean).
+### 3. Create a new dataset with the missing data imputed.
+```{r}
+library(Hmisc)
+activity.imputed <- activity
+activity.imputed$steps <- with(activity.imputed, impute(steps, mean))
+```
 
+### 4. Make a histogram of the total number of steps taken each day and 
+
+```{r imputed_SumStep}
+Dsum.imp <-aggregate(activity.imputed[,'steps'], by=list(activity.imputed$date), FUN=sum, na.rm=TRUE)
+names(Dsum.imp) <- c("Date","Sum.step")
+
+qplot(Sum.step, data=Dsum.imp, geom="histogram", binwidth = 1000,
+      xlab="Total number of steps taken each day (after imputing)")
+```
+
+###    Calculate and report the mean and median total number of steps taken per day
+```{r}
+Dmean.imp <- aggregate(activity.imputed[,'steps'], by=list(activity.imputed$date), 
+                       FUN=mean, na.rm=TRUE)
+names(Dmean.imp) <- c("Date","Mean.step")
+
+Dmedian.imp <- aggregate(activity.imputed[,'steps'], by=list(activity.imputed$date), 
+                        FUN=median, na.rm=TRUE)
+names(Dmedian.imp) <- c("Date","Median.step")
+
+merge(Dmean.imp, Dmedian.imp, "Date")
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+### 1. Create a factor variable in the dataset with two levels- "weekday" and "weekend"
+```{r}
+weekday.yn <- function(date) {
+  day <- weekdays(date)
+  if (day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"))
+    return("weekday")
+  else if (day %in% c("Saturday", "Sunday"))
+    return("weekend")
+  else
+    stop("invalid date")
+}
+
+activity.imputed$date.fmt <- as.Date(activity.imputed$date)
+activity.imputed$day.type <- as.factor(sapply(activity.imputed$date.fmt, FUN=weekday.yn))
+```
+
+### 2. Make a panel plot of time series plot of the 5-min interval(x) and the avg steps,
+###    across weekdays or weekend days (y).
+```{r Panel_Wkday_steps}
+meansteps <- aggregate(activity.imputed$steps, 
+                       by = list(activity.imputed$interval, activity.imputed$day.type), 
+                       FUN=mean)
+names(meansteps) <- c("interval", "day.type", "steps")
+xyplot(steps ~ interval | day.type, meansteps, type = "l", layout = c(1, 2), 
+       xlab = "Interval", ylab = "Number of steps")
+```
